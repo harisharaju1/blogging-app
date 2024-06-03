@@ -6,6 +6,8 @@ import { sign } from "hono/jwt";
 // the above imports would have been different if the
 // backend app was hosted on a non-edge server
 
+import { signupInput, signinInput } from "@harisharaju/blogging-app-common";
+
 export const userRouter = new Hono<{
   Bindings: {
     DATABASE_URL: string;
@@ -16,6 +18,14 @@ export const userRouter = new Hono<{
 userRouter.post("/signin", async (c) => {
   // for user to signin
   const body = await c.req.json();
+
+  const success = signinInput.safeParse(body);
+  if (!success) {
+    c.status(411);
+    return c.json({
+      error: "inputs not correct",
+    });
+  }
 
   const prisma = new PrismaClient({
     datasourceUrl: c.env.DATABASE_URL,
@@ -60,7 +70,14 @@ userRouter.post("/signup", async (c) => {
   }).$extends(withAccelerate());
 
   const body = await c.req.json();
-  //add Zod validation here
+
+  const success = signupInput.safeParse(body);
+  if (!success) {
+    c.status(411);
+    return c.json({
+      error: "inputs not correct",
+    });
+  }
 
   try {
     const user = await prisma.user.create({
