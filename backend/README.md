@@ -5,4 +5,4 @@ npm run dev
 
 ```
 npm run deploy
-![Local Image](./connection_pool.png "reason for using Prisma Accelerate")
+![connection_pool](https://github.com/harisharaju1/blogging-app/assets/22733255/b8b2bea7-364a-4708-9fbb-73de722bbcb6)
