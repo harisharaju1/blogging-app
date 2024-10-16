@@ -34,7 +34,7 @@ userRouter.post("/signin", async (c) => {
   try {
     const user = await prisma.user.findUnique({
       where: {
-        email: body.email,
+        username: body.username,
       },
     });
 
@@ -64,35 +64,43 @@ userRouter.post("/signin", async (c) => {
 });
 
 userRouter.post("/signup", async (c) => {
-  // prisma route config
+  // Initialize Prisma client with Accelerate extension
   const prisma = new PrismaClient({
     datasourceUrl: c.env?.DATABASE_URL,
   }).$extends(withAccelerate());
 
+  // Parse the request body
   const body = await c.req.json();
 
+  // Validate input using Zod schema
   const success = signupInput.safeParse(body);
   if (!success) {
+    // If validation fails, return a 411 status code
     c.status(411);
     return c.json({
-      error: "inputs not correct",
+      error: "Invalid input data",
     });
   }
 
   try {
+    // Create a new user in the database
     const user = await prisma.user.create({
       data: {
-        email: body.email,
-        password: body.password,
+        username: body.email,
+        password: body.password, // Note: Password should be hashed before storing
       },
     });
 
+    // Generate a JWT token for the new user
     const jwt = await sign({ id: user.id }, c.env.JWT_SECRET);
 
+    // Set the JWT token in the response header
     c.res.headers.set("authorization", `Bearer ${jwt}`);
 
+    // Return a success message
     return c.json({ message: "Registration successful" });
   } catch (error) {
+    // Handle any errors during user creation
     c.status(401);
     return c.json({ message: (error as Error).message });
   }

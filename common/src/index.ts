@@ -1,5 +1,5 @@
 import z from "zod";
-
+//
 // backend variables
 export const signupInput = z.object({
   email: z.string().email(),

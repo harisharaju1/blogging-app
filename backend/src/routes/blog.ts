@@ -20,10 +20,12 @@ export const blogRouter = new Hono<{
   };
 }>();
 
+// Middleware to authenticate user for all blog routes
 blogRouter.use("/*", async (c, next) => {
-  // extract user Id from JWT
-  // make it available to the route handlers
+  // Extract the Authorization token from the request header
   const token = c.req.header("Authorization") || "";
+
+  // Check if token is present
   if (!token) {
     c.status(401);
     return c.json({
@@ -32,7 +34,10 @@ blogRouter.use("/*", async (c, next) => {
   }
 
   try {
+    // Verify the JWT token
     const jwt = await verify(token, c.env.JWT_SECRET);
+
+    // Double-check if JWT verification was successful
     if (!jwt) {
       c.status(401);
       return c.json({
@@ -40,9 +45,13 @@ blogRouter.use("/*", async (c, next) => {
       });
     }
 
+    // Set the userId in the context for use in route handlers
     c.set("userId", String(jwt.id));
+
+    // Continue to the next middleware or route handler
     await next();
   } catch (error) {
+    // Handle any errors during token verification
     c.status(403);
     return c.json({
       message: "User not authenticated",
@@ -73,7 +82,7 @@ blogRouter.post("/", async (c) => {
     data: {
       title: body.title,
       content: body.content,
-      authorId: userId,
+      authorId: Number(userId),
     },
   });
 
@@ -114,20 +123,44 @@ blogRouter.put("/", async (c) => {
 });
 
 blogRouter.get("/bulk", async (c) => {
-  // for a user to get a list of blog posts
-  // pagination to be added here
+  // for a user to get a list of blog posts with pagination
   const prisma = new PrismaClient({
     datasourceUrl: c.env.DATABASE_URL,
   }).$extends(withAccelerate());
 
+  const page = parseInt(c.req.query("page") || "1");
+  const limit = parseInt(c.req.query("limit") || "10");
+  const skip = (page - 1) * limit;
+
   try {
-    const posts = await prisma.post.findMany();
-    console.log("posts:", posts);
-    return c.json(posts);
-  } catch (error) {
-    c.status(404);
+    const [posts, totalCount] = await Promise.all([
+      prisma.post.findMany({
+        skip,
+        take: limit,
+        orderBy: {
+          id: "desc",
+        },
+      }),
+      prisma.post.count(),
+    ]);
+
+    const totalPages = Math.ceil(totalCount / limit);
+
     return c.json({
-      message: "Error while getting all post",
+      posts,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalCount,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    });
+  } catch (error) {
+    c.status(500);
+    return c.json({
+      message: "Error while fetching posts",
+      error: (error as Error).message,
     });
   }
 });
@@ -143,7 +176,7 @@ blogRouter.get("/:id", async (c) => {
   try {
     const post = await prisma.post.findFirst({
       where: {
-        id: id,
+        id: Number(id),
       },
     });
     return c.json({
